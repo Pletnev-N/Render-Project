@@ -355,15 +355,6 @@ LRESULT DXApp::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
-//bool DXApp::Init()
-//{
-//    bool res;
-//	res = CreateDevice();
-//    UINT m_4xMsaaQuality = Check4xMSAA();
-//	bool mEnable4xMsaa = m_4xMsaaQuality > 0;
-//    return res;
-//}
-
 bool DXApp::InitMainWindow()
 {
 	WNDCLASS wc;
@@ -533,81 +524,6 @@ void DXApp::CalculateFrameStats()
 		frameCnt = 0;
 		timeElapsed += 1.0f;
 	}
-}
-
-bool DXApp::CreateDevice()
-{
-    UINT createDeviceFlags = 0;
-#if defined(DEBUG) || defined(_DEBUG)
-    createDeviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
-
-    D3D_FEATURE_LEVEL featureLevel;
-
-    HRESULT hr = D3D11CreateDevice(
-        0, // default adapter
-        D3D_DRIVER_TYPE_HARDWARE,
-        0, // no software device
-        createDeviceFlags,
-        0, 0, // default feature level array
-        D3D11_SDK_VERSION,
-        &md3dDevice,
-        &featureLevel,
-        &md3dImmediateContext);
-
-    if (FAILED(hr))
-    {
-        assert(SUCCEEDED(hr));
-        MessageBox(0, L"D3D11CreateDevice Failed.", 0, 0);
-        return false;
-    }
-
-    if (featureLevel != D3D_FEATURE_LEVEL_11_0)
-    {
-        MessageBox(0, L"Direct3D Feature Level 11 unsupported.", 0, 0);
-        return false;
-    }
-
-    return true;
-}
-
-UINT DXApp::Check4xMSAA()
-{
-    UINT m4xMsaaQuality = 0;
-    HR(md3dDevice->CheckMultisampleQualityLevels(DXGI_FORMAT_R8G8B8A8_UNORM, 4, &m4xMsaaQuality));
-    assert(m4xMsaaQuality > 0);
-
-    return m4xMsaaQuality;
-}
-
-void DXApp::FillSwapChainDescr()
-{
-    DXGI_SWAP_CHAIN_DESC sd;
-    sd.BufferDesc.Width = mClientWidth; // use window's client area dims
-    sd.BufferDesc.Height = mClientHeight;
-    sd.BufferDesc.RefreshRate.Numerator = 60;
-    sd.BufferDesc.RefreshRate.Denominator = 1;
-    sd.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
-    sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
-
-    if (mEnable4xMsaa)
-    {
-        sd.SampleDesc.Count = 4;
-        sd.SampleDesc.Quality = m4xMsaaQuality - 1;
-    }
-    else
-    {
-        sd.SampleDesc.Count = 1;
-        sd.SampleDesc.Quality = 0;
-    }
-
-    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    sd.BufferCount = 1;
-    sd.OutputWindow = mhMainWnd;
-    sd.Windowed = true;
-    sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
-    sd.Flags = 0;
 }
 
 void DXApp::UpdateScene(float dt)

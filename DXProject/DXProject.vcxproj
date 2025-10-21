@@ -22,10 +22,13 @@
     <ClCompile Include="source\dxapp.cpp" />
     <ClCompile Include="source\GameTimer.cpp" />
     <ClCompile Include="source\main.cpp" />
+    <ClCompile Include="source\Renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\dxapp.h" />
     <ClInclude Include="include\GameTimer.h" />
+    <ClInclude Include="include\Renderer.h" />
+    <ClInclude Include="include\Utils.h" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="shaders\PixelShader.hlsl">
@@ -135,7 +138,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\user\Desktop\DXProject\DXProject\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\repositories\DXProject\DXProject\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

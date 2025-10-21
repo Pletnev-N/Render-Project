@@ -1,13 +1,12 @@
-#ifndef GAMETIMER_H
-#define GAMETIMER_H
+#pragma once
 
 class GameTimer
 {
 public:
 	GameTimer();
 
-	float TotalTime()const;  // in seconds
-	float DeltaTime()const; // in seconds
+	float TotalTime() const;  // in seconds
+	float DeltaTime() const; // in seconds
 
 	void Reset(); // Call before message loop.
 	void Start(); // Call when unpaused.
@@ -26,5 +25,3 @@ private:
 
 	bool mStopped;
 };
-
-#endif // GAMETIMER_H

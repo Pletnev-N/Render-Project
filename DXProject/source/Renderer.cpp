@@ -5,6 +5,7 @@
 #include <DirectXColors.h>
 #include <d3d11shader.h>
 #include <sstream>
+#include <FbxReader.h>
 
 Renderer::Renderer()
     : md3dDriverType(D3D_DRIVER_TYPE_HARDWARE),
@@ -28,7 +29,9 @@ Renderer::Renderer()
 
     mTheta(1.5f * XM_PI),
     mPhi(0.25f * XM_PI),
-    mRadius(5.0f)
+    mRadius(5.0f),
+
+	mIndexCount(0)
 {
     ZeroMemory(&mScreenViewport, sizeof(D3D11_VIEWPORT));
 
@@ -110,7 +113,7 @@ void Renderer::DrawScene()
 	static_cast<VS_CONSTANT_BUFFER*>(mappedResource.pData)->mWorldViewProj = worldViewProj;
 	md3dImmediateContext->Unmap(mVsConstantBuffer, 0);
 
-	md3dImmediateContext->DrawIndexed(36, 0, 0);
+	md3dImmediateContext->DrawIndexed(mIndexCount, 0, 0);
 
 	HR(mSwapChain->Present(0, 0));
 }
@@ -274,6 +277,53 @@ void Renderer::CreateShaders()
 }
 
 void Renderer::CreateMesh()
+{
+	std::vector<Vertex> vertices;
+	std::vector<UINT> indices;
+
+	FBXReader fbxReader;
+	fbxReader.LoadFbxFile("C:\\repositories\\DXProject\\models\\coca-cola\\coca-cola.fbx");
+	//fbxReader.LoadFbxFile("C:\\repositories\\DXProject\\models\\eyeball\\eyeball.fbx");
+	fbxReader.GetVertices(vertices, indices);
+	mIndexCount = indices.size();
+
+	D3D11_BUFFER_DESC vertexBufDescr;
+	vertexBufDescr.Usage = D3D11_USAGE_IMMUTABLE;
+	vertexBufDescr.ByteWidth = sizeof(Vertex) * static_cast<UINT>(vertices.size());
+	vertexBufDescr.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+	vertexBufDescr.CPUAccessFlags = 0;
+	vertexBufDescr.MiscFlags = 0;
+	vertexBufDescr.StructureByteStride = 0;
+
+	D3D11_SUBRESOURCE_DATA vertexData;
+	vertexData.pSysMem = vertices.data();
+
+	ID3D11Buffer* vertexBuffer;
+	HR(md3dDevice->CreateBuffer(&vertexBufDescr, &vertexData, &vertexBuffer));
+
+	UINT stride = sizeof(Vertex);
+	UINT offset = 0;
+	md3dImmediateContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
+
+
+	D3D11_BUFFER_DESC indexBufDescr;
+	indexBufDescr.Usage = D3D11_USAGE_IMMUTABLE;
+	indexBufDescr.ByteWidth = sizeof(UINT) * static_cast<UINT>(indices.size());
+	indexBufDescr.BindFlags = D3D11_BIND_INDEX_BUFFER;
+	indexBufDescr.CPUAccessFlags = 0;
+	indexBufDescr.MiscFlags = 0;
+	indexBufDescr.StructureByteStride = 0;
+
+	D3D11_SUBRESOURCE_DATA indexData;
+	indexData.pSysMem = indices.data();
+
+	ID3D11Buffer* indexBuffer;
+	HR(md3dDevice->CreateBuffer(&indexBufDescr, &indexData, &indexBuffer));
+
+	md3dImmediateContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R32_UINT, 0);
+}
+
+void Renderer::CreateCubeMesh()
 {
 	Vertex vertices[] =
 	{

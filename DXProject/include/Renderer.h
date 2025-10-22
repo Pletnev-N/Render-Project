@@ -1,24 +1,13 @@
 #pragma once
 
 #include <d3d11.h>
-#include <DirectXMath.h>
 #include <string>
+#include <RenderDefs.h>
 
 #include "Utils.h"
 #include "GameTimer.h"
 
 using namespace DirectX;
-
-struct Vertex
-{
-    XMFLOAT3 Pos;
-    XMFLOAT4 Color;
-};
-
-struct VS_CONSTANT_BUFFER
-{
-    XMFLOAT4X4 mWorldViewProj;
-};
 
 class Renderer
 {
@@ -41,6 +30,7 @@ private:
     bool InitDirect3D(HWND mhMainWnd);
     void CreateShaders();
     void CreateMesh();
+    void CreateCubeMesh();
     void CreateConstantBuffer();
 
     float AspectRatio() const;
@@ -76,4 +66,6 @@ private:
     float mPhi;
     float mRadius;
     POINT mLastMousePos;
+
+    UINT mIndexCount;
 };

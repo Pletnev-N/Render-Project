@@ -20,13 +20,16 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\dxapp.cpp" />
+    <ClCompile Include="source\FbxReader.cpp" />
     <ClCompile Include="source\GameTimer.cpp" />
     <ClCompile Include="source\main.cpp" />
     <ClCompile Include="source\Renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\dxapp.h" />
+    <ClInclude Include="include\FbxReader.h" />
     <ClInclude Include="include\GameTimer.h" />
+    <ClInclude Include="include\RenderDefs.h" />
     <ClInclude Include="include\Renderer.h" />
     <ClInclude Include="include\Utils.h" />
   </ItemGroup>
@@ -138,12 +141,13 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\repositories\DXProject\DXProject\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\repositories\DXProject\DXProject\include;C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;D3DCompiler.lib;dxgi.lib;dxguid.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;D3DCompiler.lib;dxgi.lib;dxguid.lib;libfbxsdk-md.lib;libxml2-md.lib;zlib-md.lib;alembic-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\lib\x64\debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

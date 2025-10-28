@@ -30,6 +30,12 @@
     <ClCompile Include="source\FbxReader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="include\LogWriter.h">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="source\LogWriter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\dxapp.h">

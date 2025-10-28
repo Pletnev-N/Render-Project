@@ -2,6 +2,7 @@
 
 #include <DirectXMath.h>
 #include <windows.h>
+#include <LogWriter.h>
 
 struct Vertex
 {

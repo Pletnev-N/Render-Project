@@ -110,6 +110,8 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
     if (!pNode)
         return;
 
+    static int meshNum = 0;
+
     std::random_device dev;
     std::mt19937 rng(dev());
     std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 7); // distribution in range [0, 7]
@@ -117,6 +119,8 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
     FbxMesh* mesh = pNode->GetMesh();
     if (mesh)
     {
+        LOG("Mesh ", meshNum++);
+
         // Extract vertex positions (control points)
         int numVertices = mesh->GetControlPointsCount();
         FbxVector4* controlPoints = mesh->GetControlPoints();
@@ -153,6 +157,62 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
                 }
             }
         }
+
+        ////////////////////////////////////////////////////////////////////////////////////
+        FbxGeometryElementNormal* normalElement = mesh->GetElementNormal();
+        if (normalElement)
+        {
+            //mapping mode is by control points. The mesh should be smooth and soft.
+            if (normalElement->GetMappingMode() == FbxGeometryElement::eByControlPoint)
+            {
+                for (int vertexIndex = 0; vertexIndex < mesh->GetControlPointsCount(); vertexIndex++)
+                {
+                    int normalIndex = 0;
+                    //reference mode is direct, the normal index is same as vertex index.
+                    if (normalElement->GetReferenceMode() == FbxGeometryElement::eDirect)
+                        normalIndex = vertexIndex;
+
+                    //reference mode is index-to-direct, get normals by the index-to-direct
+                    if (normalElement->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+                        normalIndex = normalElement->GetIndexArray().GetAt(vertexIndex);
+
+                    FbxVector4 lNormal = normalElement->GetDirectArray().GetAt(normalIndex);
+                    //add your custom code here, to output normals or get them into a list, such as KArrayTemplate<FbxVector4>
+                    //. . .
+                }
+            }
+            //mapping mode is by polygon-vertex.
+            else if (normalElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+            {
+                int indexByPolygonVertex = 0;
+                for (int polygonIndex = 0; polygonIndex < mesh->GetPolygonCount(); polygonIndex++)
+                {
+                    LOG(" Polygon ", polygonIndex);
+                    int polygonSize = mesh->GetPolygonSize(polygonIndex);
+                    for (int i = 0; i < polygonSize; i++)
+                    {
+                        int normalIndex = 0;
+                        //reference mode is direct, the normal index is same as indexByPolygonVertex.
+                        if (normalElement->GetReferenceMode() == FbxGeometryElement::eDirect)
+                            normalIndex = indexByPolygonVertex;
+
+                        //reference mode is index-to-direct, get normals by the index-to-direct
+                        if (normalElement->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+                            normalIndex = normalElement->GetIndexArray().GetAt(indexByPolygonVertex);
+
+                        FbxVector4 normal = normalElement->GetDirectArray().GetAt(normalIndex);
+                        LOG("  Vertex ", mesh->GetPolygonVertex(polygonIndex, i), " - Normal (", normal[0], ", ", normal[1], ", ", normal[2], ")");
+                        //add your custom code here, to output normals or get them into a list, such as KArrayTemplate<FbxVector4>
+                        //. . .
+
+                        indexByPolygonVertex++;
+                    }
+                }
+
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////////////////////////
     }
 
     int i, count = pNode->GetChildCount();

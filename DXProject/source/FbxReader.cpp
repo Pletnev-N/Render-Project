@@ -103,6 +103,7 @@ bool FBXReader::LoadFbxFile(const std::string& filename)
     ASSERT(mpScene, "null scene");
 
     mpRootNode = mpScene->GetRootNode();
+    return result;
 }
 
 void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& vertices, std::vector<UINT>& indices)
@@ -165,6 +166,7 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
             //mapping mode is by control points. The mesh should be smooth and soft.
             if (normalElement->GetMappingMode() == FbxGeometryElement::eByControlPoint)
             {
+                ASSERT(false, "Not implemented");
                 for (int vertexIndex = 0; vertexIndex < mesh->GetControlPointsCount(); vertexIndex++)
                 {
                     int normalIndex = 0;
@@ -204,6 +206,9 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
                         LOG("  Vertex ", mesh->GetPolygonVertex(polygonIndex, i), " - Normal (", normal[0], ", ", normal[1], ", ", normal[2], ")");
                         //add your custom code here, to output normals or get them into a list, such as KArrayTemplate<FbxVector4>
                         //. . .
+                        vertices[mesh->GetPolygonVertex(polygonIndex, i) + shift].Normal.x = static_cast<float>(normal[0]);
+                        vertices[mesh->GetPolygonVertex(polygonIndex, i) + shift].Normal.y = static_cast<float>(normal[1]);
+                        vertices[mesh->GetPolygonVertex(polygonIndex, i) + shift].Normal.z = static_cast<float>(normal[2]);
 
                         indexByPolygonVertex++;
                     }

@@ -31,7 +31,8 @@ private:
     void CreateShaders();
     void CreateMesh();
     void CreateCubeMesh();
-    void CreateConstantBuffer();
+    void CreateConstantBuffers();
+    void SetupLights();
 
     float AspectRatio() const;
 
@@ -50,8 +51,9 @@ private:
     ID3D11VertexShader* mVertexShader;
     ID3D11PixelShader* mPixelShader;
 
-    ID3D11Buffer* mVsConstantBuffer;
     ID3D11InputLayout* mInputLayout;
+    ID3D11Buffer* mPerFrameCbuffer;
+    ID3D11Buffer* mDirectionalLightBuffer;
 
     UINT m4xMsaaQuality;
     bool mEnable4xMsaa;

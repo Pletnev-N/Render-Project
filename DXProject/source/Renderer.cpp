@@ -24,11 +24,12 @@ Renderer::Renderer()
     mDepthStencilView(0),
     mVertexShader(nullptr),
     mPixelShader(nullptr),
-    mVsConstantBuffer(nullptr),
     mInputLayout(nullptr),
+	mPerFrameCbuffer(nullptr),
+    mDirectionalLightBuffer(nullptr),
 
-    mTheta(1.5f * XM_PI),
-    mPhi(0.25f * XM_PI),
+    mTheta(0),
+    mPhi(0.5f * XM_PI),
     mRadius(5.0f),
 
 	mIndexCount(0)
@@ -52,7 +53,7 @@ Renderer::~Renderer()
     ReleaseCOM(mDepthStencilBuffer);
     ReleaseCOM(mVertexShader);
     ReleaseCOM(mPixelShader);
-    ReleaseCOM(mVsConstantBuffer);
+    ReleaseCOM(mPerFrameCbuffer);
     ReleaseCOM(mInputLayout);
 
     // Restore all default settings.
@@ -69,7 +70,9 @@ bool Renderer::Init(HWND mhMainWnd)
 
 	CreateShaders();
 	CreateMesh();
-	CreateConstantBuffer();
+	CreateConstantBuffers();
+
+    SetupLights();
 
 	mbInitialized = true;
     return true;
@@ -77,16 +80,34 @@ bool Renderer::Init(HWND mhMainWnd)
 
 void Renderer::UpdateScene(float dt)
 {
-	// Convert Spherical to Cartesian coordinates.
+    // Get camera position in Cartesian coordinates
 	float x = mRadius * sinf(mPhi) * cosf(mTheta);
 	float z = mRadius * sinf(mPhi) * sinf(mTheta);
 	float y = mRadius * cosf(mPhi);
-	// Build the view matrix.
+
+    LOG("Camera position: x=", x, " y=", y, " z=", z);
+	
+	// Build the view matrix
 	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
 	XMVECTOR target = XMVectorZero();
 	XMVECTOR up = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-	XMMATRIX V = XMMatrixLookAtLH(pos, target, up);
-	XMStoreFloat4x4(&mView, V);
+	XMMATRIX view = XMMatrixLookAtLH(pos, target, up);
+	XMStoreFloat4x4(&mView, view);
+
+	XMMATRIX world = XMLoadFloat4x4(&mWorld);
+	XMMATRIX proj = XMLoadFloat4x4(&mProj);
+	XMMATRIX worldViewProj = XMMatrixTranspose(world * view * proj);
+	XMMATRIX worldInvTrans = XMMatrixTranspose(XMMatrixInverse(nullptr, world));
+
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	md3dImmediateContext->Map(mPerFrameCbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	PER_FRAME_CBUFFER* data = static_cast<PER_FRAME_CBUFFER*>(mappedResource.pData);
+	XMStoreFloat4x4(&data->mWorldViewProj, worldViewProj);
+	XMStoreFloat4x4(&data->mWorldInvTrans, worldInvTrans);
+	data->mWorld = mWorld;
+	data->CamPos = XMFLOAT4(x, y, z, 1.0f);
+	md3dImmediateContext->Unmap(mPerFrameCbuffer, 0);
 }
 
 void Renderer::DrawScene()
@@ -100,18 +121,6 @@ void Renderer::DrawScene()
 	md3dImmediateContext->ClearDepthStencilView(mDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	md3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	md3dImmediateContext->IASetInputLayout(mInputLayout);
-
-	XMMATRIX world = XMLoadFloat4x4(&mWorld);
-	XMMATRIX view = XMLoadFloat4x4(&mView);
-	XMMATRIX proj = XMLoadFloat4x4(&mProj);
-	XMFLOAT4X4 worldViewProj;
-	XMStoreFloat4x4(&worldViewProj, XMMatrixTranspose(world * view * proj));
-
-	D3D11_MAPPED_SUBRESOURCE mappedResource;
-	ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
-	md3dImmediateContext->Map(mVsConstantBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-	static_cast<VS_CONSTANT_BUFFER*>(mappedResource.pData)->mWorldViewProj = worldViewProj;
-	md3dImmediateContext->Unmap(mVsConstantBuffer, 0);
 
 	md3dImmediateContext->DrawIndexed(mIndexCount, 0, 0);
 
@@ -262,10 +271,11 @@ void Renderer::CreateShaders()
 	D3D11_INPUT_ELEMENT_DESC desc[] =
 	{
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0}
+		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+		{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 
-	HR(md3dDevice->CreateInputLayout(desc, 2, fileData.data(), fileData.size(), &mInputLayout));
+	HR(md3dDevice->CreateInputLayout(desc, 3, fileData.data(), fileData.size(), &mInputLayout));
 
 	shaderFile.close();
 	shaderFile.open("ShadersBin\\PixelShader.cso", std::ios::binary);
@@ -325,7 +335,7 @@ void Renderer::CreateMesh()
 
 void Renderer::CreateCubeMesh()
 {
-	Vertex vertices[] =
+	CubeVertex vertices[] =
 	{
 		{ XMFLOAT3(-1.0f, -1.0f, -1.0f), XMFLOAT4((const float*)&Colors::White) },
 		{ XMFLOAT3(-1.0f, +1.0f, -1.0f), XMFLOAT4((const float*)&Colors::Black) },
@@ -394,29 +404,62 @@ void Renderer::CreateCubeMesh()
 	md3dImmediateContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R32_UINT, 0);
 }
 
-void Renderer::CreateConstantBuffer()
+void Renderer::CreateConstantBuffers()
 {
-	VS_CONSTANT_BUFFER VsConstData;
-	XMMATRIX I = XMMatrixIdentity();
-	XMStoreFloat4x4(&VsConstData.mWorldViewProj, I);
-
-	// Fill in a buffer description.
 	D3D11_BUFFER_DESC cbDesc;
-	cbDesc.ByteWidth = sizeof(VS_CONSTANT_BUFFER);
+	D3D11_SUBRESOURCE_DATA InitData;
+
+    //------------ PER_FRAME_CBUFFER ----------------
+
+	PER_FRAME_CBUFFER PerFrameConstData;
+	XMMATRIX I = XMMatrixIdentity();
+	XMStoreFloat4x4(&PerFrameConstData.mWorldViewProj, I);
+    PerFrameConstData.CamPos = XMFLOAT4(0.0f, 0.0f, 0.0f, 1.0f);
+
+	cbDesc.ByteWidth = sizeof(PER_FRAME_CBUFFER);
 	cbDesc.Usage = D3D11_USAGE_DYNAMIC;
 	cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 	cbDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 	cbDesc.MiscFlags = 0;
 	cbDesc.StructureByteStride = 0;
 
-	// Fill in the subresource data.
-	D3D11_SUBRESOURCE_DATA InitData;
-	InitData.pSysMem = &VsConstData;
+	InitData.pSysMem = &PerFrameConstData;
 	InitData.SysMemPitch = 0;
 	InitData.SysMemSlicePitch = 0;
 
-	HR(md3dDevice->CreateBuffer(&cbDesc, &InitData, &mVsConstantBuffer));
-	md3dImmediateContext->VSSetConstantBuffers(0, 1, &mVsConstantBuffer);
+	HR(md3dDevice->CreateBuffer(&cbDesc, &InitData, &mPerFrameCbuffer));
+	md3dImmediateContext->VSSetConstantBuffers(0, 1, &mPerFrameCbuffer);
+	md3dImmediateContext->PSSetConstantBuffers(0, 1, &mPerFrameCbuffer);
+
+	//-------------- LIGHTS_CBUFFER ---------------
+
+	cbDesc.ByteWidth = sizeof(LIGHTS_CBUFFER);
+	cbDesc.Usage = D3D11_USAGE_DYNAMIC;
+	cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	cbDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	cbDesc.MiscFlags = 0;
+	cbDesc.StructureByteStride = 0;
+
+	HR(md3dDevice->CreateBuffer(&cbDesc, nullptr, &mDirectionalLightBuffer));
+	md3dImmediateContext->PSSetConstantBuffers(1, 1, &mDirectionalLightBuffer);
+}
+
+void Renderer::SetupLights()
+{
+	D3D11_MAPPED_SUBRESOURCE mappedResource;
+	ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
+	md3dImmediateContext->Map(mDirectionalLightBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	LIGHTS_CBUFFER* lights = static_cast<LIGHTS_CBUFFER*>(mappedResource.pData);
+
+    lights->DirLight.Ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+    lights->DirLight.Diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
+    lights->DirLight.Specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 2.0f);
+
+    XMVECTOR dir = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+    dir = XMVector3Normalize(dir);
+    XMStoreFloat3(&lights->DirLight.Direction, dir);
+
+	md3dImmediateContext->Unmap(mDirectionalLightBuffer, 0);
 }
 
 void Renderer::OnResize(int width, int height)

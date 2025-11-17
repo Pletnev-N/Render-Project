@@ -454,7 +454,7 @@ void Renderer::SetupLights()
     lights->DirLight.Diffuse = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
     lights->DirLight.Specular = XMFLOAT4(0.5f, 0.5f, 0.5f, 2.0f);
 
-    XMVECTOR dir = XMVectorSet(1.0f, 0.0f, 0.0f, 0.0f);
+    XMVECTOR dir = XMVectorSet(-0.5f, 0.0f, 0.0f, 0.0f);
     dir = XMVector3Normalize(dir);
     XMStoreFloat3(&lights->DirLight.Direction, dir);
 

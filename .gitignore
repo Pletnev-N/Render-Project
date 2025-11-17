@@ -11,4 +11,5 @@ x86/
 .vs/
 
 models/
+deps/
 *.log

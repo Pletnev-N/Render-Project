@@ -47,21 +47,9 @@ Renderer::Renderer()
 
 Renderer::~Renderer()
 {
-    ReleaseCOM(mRenderTargetView);
-    ReleaseCOM(mDepthStencilView);
-    ReleaseCOM(mSwapChain);
-    ReleaseCOM(mDepthStencilBuffer);
-    ReleaseCOM(mVertexShader);
-    ReleaseCOM(mPixelShader);
-    ReleaseCOM(mPerFrameCbuffer);
-    ReleaseCOM(mInputLayout);
-
     // Restore all default settings.
     if (md3dImmediateContext)
         md3dImmediateContext->ClearState();
-
-    ReleaseCOM(md3dImmediateContext);
-    ReleaseCOM(md3dDevice);
 }
 
 bool Renderer::Init(HWND mhMainWnd)
@@ -71,6 +59,7 @@ bool Renderer::Init(HWND mhMainWnd)
 	CreateShaders();
 	CreateMesh();
 	CreateConstantBuffers();
+	CreateMaterial();
 
     SetupLights();
 
@@ -84,8 +73,6 @@ void Renderer::UpdateScene(float dt)
 	float x = mRadius * sinf(mPhi) * cosf(mTheta);
 	float z = mRadius * sinf(mPhi) * sinf(mTheta);
 	float y = mRadius * cosf(mPhi);
-
-    LOG("Camera position: x=", x, " y=", y, " z=", z);
 	
 	// Build the view matrix
 	XMVECTOR pos = XMVectorSet(x, y, z, 1.0f);
@@ -101,13 +88,13 @@ void Renderer::UpdateScene(float dt)
 
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
 	ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
-	md3dImmediateContext->Map(mPerFrameCbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	md3dImmediateContext->Map(mPerFrameCbuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 	PER_FRAME_CBUFFER* data = static_cast<PER_FRAME_CBUFFER*>(mappedResource.pData);
 	XMStoreFloat4x4(&data->mWorldViewProj, worldViewProj);
 	XMStoreFloat4x4(&data->mWorldInvTrans, worldInvTrans);
 	data->mWorld = mWorld;
 	data->CamPos = XMFLOAT4(x, y, z, 1.0f);
-	md3dImmediateContext->Unmap(mPerFrameCbuffer, 0);
+	md3dImmediateContext->Unmap(mPerFrameCbuffer.Get(), 0);
 }
 
 void Renderer::DrawScene()
@@ -117,10 +104,10 @@ void Renderer::DrawScene()
 	assert(md3dImmediateContext);
 	assert(mSwapChain);
 
-	md3dImmediateContext->ClearRenderTargetView(mRenderTargetView, blue);
-	md3dImmediateContext->ClearDepthStencilView(mDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+	md3dImmediateContext->ClearRenderTargetView(mRenderTargetView.Get(), blue);
+	md3dImmediateContext->ClearDepthStencilView(mDepthStencilView.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 	md3dImmediateContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	md3dImmediateContext->IASetInputLayout(mInputLayout);
+	md3dImmediateContext->IASetInputLayout(mInputLayout.Get());
 
 	md3dImmediateContext->DrawIndexed(mIndexCount, 0, 0);
 
@@ -213,7 +200,7 @@ bool Renderer::InitDirect3D(HWND mhMainWnd)
 	IDXGIFactory* dxgiFactory = 0;
 	HR(dxgiAdapter->GetParent(__uuidof(IDXGIFactory), (void**)&dxgiFactory));
 
-	HR(dxgiFactory->CreateSwapChain(md3dDevice, &sd, &mSwapChain));
+	HR(dxgiFactory->CreateSwapChain(md3dDevice.Get(), &sd, &mSwapChain));
 
 	ReleaseCOM(dxgiDevice);
 	ReleaseCOM(dxgiAdapter);
@@ -266,13 +253,13 @@ void Renderer::CreateShaders()
 	std::vector<char> fileData((std::istreambuf_iterator<char>(shaderFile)), std::istreambuf_iterator<char>());
 
 	HR(md3dDevice->CreateVertexShader(fileData.data(), fileData.size(), nullptr, &mVertexShader));
-	md3dImmediateContext->VSSetShader(mVertexShader, nullptr, 0);
+	md3dImmediateContext->VSSetShader(mVertexShader.Get(), nullptr, 0);
 
 	D3D11_INPUT_ELEMENT_DESC desc[] =
 	{
 		{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
 		{"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
-		{"COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
+		{"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0}
 	};
 
 	HR(md3dDevice->CreateInputLayout(desc, 3, fileData.data(), fileData.size(), &mInputLayout));
@@ -283,23 +270,24 @@ void Renderer::CreateShaders()
 	fileData = { (std::istreambuf_iterator<char>(shaderFile)), std::istreambuf_iterator<char>() };
 
 	HR(md3dDevice->CreatePixelShader(fileData.data(), fileData.size(), nullptr, &mPixelShader));
-	md3dImmediateContext->PSSetShader(mPixelShader, nullptr, 0);
+	md3dImmediateContext->PSSetShader(mPixelShader.Get(), nullptr, 0);
 }
 
 void Renderer::CreateMesh()
 {
-	std::vector<Vertex> vertices;
+	std::vector<VertexTextured> vertices;
 	std::vector<UINT> indices;
 
 	FBXReader fbxReader;
-	fbxReader.LoadFbxFile("C:\\repositories\\DXProject\\models\\coca-cola\\coca-cola.fbx");
+	//fbxReader.LoadFbxFile("C:\\repositories\\DXProject\\models\\coca-cola\\coca-cola.fbx");
+	fbxReader.LoadFbxFile("C:\\repositories\\DXProject\\models\\coca-cola-2\\Coke_Can_Final.fbx");
 	//fbxReader.LoadFbxFile("C:\\repositories\\DXProject\\models\\eyeball\\eyeball.fbx");
 	fbxReader.GetVertices(vertices, indices);
 	mIndexCount = indices.size();
 
 	D3D11_BUFFER_DESC vertexBufDescr;
 	vertexBufDescr.Usage = D3D11_USAGE_IMMUTABLE;
-	vertexBufDescr.ByteWidth = sizeof(Vertex) * static_cast<UINT>(vertices.size());
+	vertexBufDescr.ByteWidth = sizeof(VertexTextured) * static_cast<UINT>(vertices.size());
 	vertexBufDescr.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vertexBufDescr.CPUAccessFlags = 0;
 	vertexBufDescr.MiscFlags = 0;
@@ -311,7 +299,7 @@ void Renderer::CreateMesh()
 	ID3D11Buffer* vertexBuffer;
 	HR(md3dDevice->CreateBuffer(&vertexBufDescr, &vertexData, &vertexBuffer));
 
-	UINT stride = sizeof(Vertex);
+	UINT stride = sizeof(VertexTextured);
 	UINT offset = 0;
 	md3dImmediateContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
 
@@ -349,7 +337,7 @@ void Renderer::CreateCubeMesh()
 
 	D3D11_BUFFER_DESC vertexBufDescr;
 	vertexBufDescr.Usage = D3D11_USAGE_IMMUTABLE;
-	vertexBufDescr.ByteWidth = sizeof(Vertex) * 8;
+	vertexBufDescr.ByteWidth = sizeof(CubeVertex) * 8;
 	vertexBufDescr.BindFlags = D3D11_BIND_VERTEX_BUFFER;
 	vertexBufDescr.CPUAccessFlags = 0;
 	vertexBufDescr.MiscFlags = 0;
@@ -361,7 +349,7 @@ void Renderer::CreateCubeMesh()
 	ID3D11Buffer* vertexBuffer;
 	HR(md3dDevice->CreateBuffer(&vertexBufDescr, &vertexData, &vertexBuffer));
 
-	UINT stride = sizeof(Vertex);
+	UINT stride = sizeof(CubeVertex);
 	UINT offset = 0;
 	md3dImmediateContext->IASetVertexBuffers(0, 1, &vertexBuffer, &stride, &offset);
 
@@ -427,9 +415,9 @@ void Renderer::CreateConstantBuffers()
 	InitData.SysMemPitch = 0;
 	InitData.SysMemSlicePitch = 0;
 
-	HR(md3dDevice->CreateBuffer(&cbDesc, &InitData, &mPerFrameCbuffer));
-	md3dImmediateContext->VSSetConstantBuffers(0, 1, &mPerFrameCbuffer);
-	md3dImmediateContext->PSSetConstantBuffers(0, 1, &mPerFrameCbuffer);
+	HR(md3dDevice->CreateBuffer(&cbDesc, &InitData, mPerFrameCbuffer.GetAddressOf()));
+	md3dImmediateContext->VSSetConstantBuffers(0, 1, mPerFrameCbuffer.GetAddressOf());
+	md3dImmediateContext->PSSetConstantBuffers(0, 1, mPerFrameCbuffer.GetAddressOf());
 
 	//-------------- LIGHTS_CBUFFER ---------------
 
@@ -440,15 +428,26 @@ void Renderer::CreateConstantBuffers()
 	cbDesc.MiscFlags = 0;
 	cbDesc.StructureByteStride = 0;
 
-	HR(md3dDevice->CreateBuffer(&cbDesc, nullptr, &mDirectionalLightBuffer));
-	md3dImmediateContext->PSSetConstantBuffers(1, 1, &mDirectionalLightBuffer);
+	HR(md3dDevice->CreateBuffer(&cbDesc, nullptr, mDirectionalLightBuffer.GetAddressOf()));
+	md3dImmediateContext->PSSetConstantBuffers(1, 1, mDirectionalLightBuffer.GetAddressOf());
+}
+
+void Renderer::CreateMaterial()
+{
+    
+    mMaterial.LoadTextures(md3dDevice,
+		//L"C:\\repositories\\DXProject\\\models\\coca-cola-2\\Coke_Clean\\test.tga",
+		L"C:\\repositories\\DXProject\\\models\\coca-cola-2\\Coke_Clean\\Coke_Can_VRayMtl1_Reflection.tga",
+		L"C:\\repositories\\DXProject\\\models\\coca-cola-2\\Coke_Clean\\Coke_Can_VRayMtl1_Normal.tga"
+	);
+    mMaterial.AttachToShaders(md3dImmediateContext);
 }
 
 void Renderer::SetupLights()
 {
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
 	ZeroMemory(&mappedResource, sizeof(D3D11_MAPPED_SUBRESOURCE));
-	md3dImmediateContext->Map(mDirectionalLightBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	md3dImmediateContext->Map(mDirectionalLightBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 	LIGHTS_CBUFFER* lights = static_cast<LIGHTS_CBUFFER*>(mappedResource.pData);
 
     lights->DirLight.Ambient = XMFLOAT4(0.5f, 0.5f, 0.5f, 1.0f);
@@ -459,7 +458,7 @@ void Renderer::SetupLights()
     dir = XMVector3Normalize(dir);
     XMStoreFloat3(&lights->DirLight.Direction, dir);
 
-	md3dImmediateContext->Unmap(mDirectionalLightBuffer, 0);
+	md3dImmediateContext->Unmap(mDirectionalLightBuffer.Get(), 0);
 }
 
 void Renderer::OnResize(int width, int height)
@@ -474,9 +473,9 @@ void Renderer::OnResize(int width, int height)
 	// Release the old views, as they hold references to the buffers we
 	// will be destroying.  Also release the old depth/stencil buffer.
 
-	ReleaseCOM(mRenderTargetView);
-	ReleaseCOM(mDepthStencilView);
-	ReleaseCOM(mDepthStencilBuffer);
+	mRenderTargetView.Reset();
+	mDepthStencilView.Reset();
+	mDepthStencilBuffer.Reset();
 
 
 	// Resize the swap chain and recreate the render target view.
@@ -484,7 +483,7 @@ void Renderer::OnResize(int width, int height)
 	HR(mSwapChain->ResizeBuffers(1, mClientWidth, mClientHeight, DXGI_FORMAT_R8G8B8A8_UNORM, 0));
 	ID3D11Texture2D* backBuffer;
 	HR(mSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), reinterpret_cast<void**>(&backBuffer)));
-	HR(md3dDevice->CreateRenderTargetView(backBuffer, 0, &mRenderTargetView));
+	HR(md3dDevice->CreateRenderTargetView(backBuffer, 0, mRenderTargetView.GetAddressOf()));
 	ReleaseCOM(backBuffer);
 
 	// Create the depth/stencil buffer and view.
@@ -515,13 +514,13 @@ void Renderer::OnResize(int width, int height)
 	depthStencilDesc.CPUAccessFlags = 0;
 	depthStencilDesc.MiscFlags = 0;
 
-	HR(md3dDevice->CreateTexture2D(&depthStencilDesc, 0, &mDepthStencilBuffer));
-	HR(md3dDevice->CreateDepthStencilView(mDepthStencilBuffer, 0, &mDepthStencilView));
+	HR(md3dDevice->CreateTexture2D(&depthStencilDesc, 0, mDepthStencilBuffer.GetAddressOf()));
+	HR(md3dDevice->CreateDepthStencilView(mDepthStencilBuffer.Get(), 0, mDepthStencilView.GetAddressOf()));
 
 
 	// Bind the render target view and depth/stencil view to the pipeline.
 
-	md3dImmediateContext->OMSetRenderTargets(1, &mRenderTargetView, mDepthStencilView);
+	md3dImmediateContext->OMSetRenderTargets(1, mRenderTargetView.GetAddressOf(), mDepthStencilView.Get());
 
 
 	// Set the viewport transform.

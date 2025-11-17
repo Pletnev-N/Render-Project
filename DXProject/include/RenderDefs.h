@@ -3,12 +3,22 @@
 #include <DirectXMath.h>
 #include <windows.h>
 #include <LogWriter.h>
+#include <wrl/client.h>
+
+using Microsoft::WRL::ComPtr;
 
 struct Vertex
 {
     DirectX::XMFLOAT3 Pos;
     DirectX::XMFLOAT3 Normal;
     DirectX::XMFLOAT4 Color;
+};
+
+struct VertexTextured
+{
+    DirectX::XMFLOAT3 Pos;
+    DirectX::XMFLOAT3 Normal;
+    DirectX::XMFLOAT2 Tex;
 };
 
 struct CubeVertex

@@ -25,7 +25,7 @@ struct VertexOut
     float4 PosH : SV_POSITION;
     float4 PosW : POSITION;
     float3 NormalW : NORMAL;
-    float4 Color : COLOR;
+    float2 TexUV : TEXCOORD;
 };
 
 struct Material
@@ -35,6 +35,14 @@ struct Material
     float4 Specular; // w = SpecPower
 };
 
+Texture2D gColorsMap : register(t0);
+Texture2D gNormalMap : register(t1);
+
+SamplerState gSamplerAnisotropic
+{
+    Filter = ANISOTROPIC;
+    MaxAnisotropy = 4;
+};
 
 void ComputeDirectionalLight(Material mat,
 float3 normal, float3 toEye,
@@ -74,15 +82,17 @@ float4 main(VertexOut pin) : SV_Target
     toEye /= distToEye;
 
     Material mat;
-    mat.Ambient = float4(0.5f, 0.5f, 0.5f, 1.0f),
+    mat.Ambient = float4(1.0f, 1.0f, 1.0f, 1.0f),
     mat.Diffuse = float4(1.0f, 1.0f, 1.0f, 1.0f),
-    mat.Specular = float4(0.5f, 0.5f, 0.5f, 3.0f);
+    mat.Specular = float4(0.5f, 0.5f, 0.5f, 5.0f);
+    
+    float4 texColor = gColorsMap.Sample(gSamplerAnisotropic, pin.TexUV);
     
     ComputeDirectionalLight(mat, normalize(pin.NormalW),
         toEye, ambient, diffuse, spec
     );
 
-    float4 litColor = ambient + diffuse + spec;
+    float4 litColor = texColor * (ambient + diffuse) + spec;
     litColor.a = 1.0f;
     
     return litColor; //pin.Color;

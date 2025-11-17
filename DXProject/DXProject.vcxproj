@@ -25,12 +25,14 @@
     <ClCompile Include="source\GameTimer.cpp" />
     <ClCompile Include="source\LogWriter.cpp" />
     <ClCompile Include="source\main.cpp" />
+    <ClCompile Include="source\Material.cpp" />
     <ClCompile Include="source\Renderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\dxapp.h" />
     <ClInclude Include="include\FbxReader.h" />
     <ClInclude Include="include\GameTimer.h" />
+    <ClInclude Include="include\Material.h" />
     <ClInclude Include="include\RenderDefs.h" />
     <ClInclude Include="include\Renderer.h" />
     <ClInclude Include="include\Utils.h" />
@@ -143,14 +145,14 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\repositories\DXProject\DXProject\include;C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\repositories\DXProject\DXProject\include;C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\include;C:\repositories\DXProject\deps\DirectXTK-oct2025\Inc;C:\repositories\DXProject\deps\DirectXTex-oct2025;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>d3d11.lib;D3DCompiler.lib;dxgi.lib;dxguid.lib;libfbxsdk-md.lib;libxml2-md.lib;zlib-md.lib;alembic-md.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\lib\x64\debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>d3d11.lib;D3DCompiler.lib;dxgi.lib;dxguid.lib;libfbxsdk-md.lib;libxml2-md.lib;zlib-md.lib;alembic-md.lib;DirectXTK.lib;DirectXTex.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:\Program Files\Autodesk\FBX\FBX SDK\2020.3.7\lib\x64\debug;C:\repositories\DXProject\deps\DirectXTK-oct2025\Bin\Desktop_2022\x64\Debug;C:\repositories\DXProject\deps\DirectXTex-oct2025\DirectXTex\Bin\Desktop_2022\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <FxCompile>
       <ShaderModel>5.0</ShaderModel>

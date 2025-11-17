@@ -106,7 +106,7 @@ bool FBXReader::LoadFbxFile(const std::string& filename)
     return result;
 }
 
-void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& vertices, std::vector<UINT>& indices)
+void FBXReader::GetMeshDataOld(FbxNode* pNode, UINT shift, std::vector<VertexTextured>& vertices, std::vector<UINT>& indices)
 {
     if (!pNode)
         return;
@@ -127,12 +127,12 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
         FbxVector4* controlPoints = mesh->GetControlPoints();
         for (int i = 0; i < numVertices; ++i)
         {
-            Vertex vertex;
+            VertexTextured vertex;
             vertex.Pos.x = controlPoints[i][0];
             vertex.Pos.y = controlPoints[i][1];
             vertex.Pos.z = controlPoints[i][2];
             
-            vertex.Color = randomColors[dist6(rng)];
+            //vertex.Color = randomColors[dist6(rng)];
 
             vertices.push_back(vertex);
         }
@@ -163,6 +163,8 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
         FbxGeometryElementNormal* normalElement = mesh->GetElementNormal();
         if (normalElement)
         {
+            FbxVector4 normal;
+
             //mapping mode is by control points. The mesh should be smooth and soft.
             if (normalElement->GetMappingMode() == FbxGeometryElement::eByControlPoint)
             {
@@ -189,7 +191,7 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
                 int indexByPolygonVertex = 0;
                 for (int polygonIndex = 0; polygonIndex < mesh->GetPolygonCount(); polygonIndex++)
                 {
-                    LOG(" Polygon ", polygonIndex);
+                    //LOG(" Polygon ", polygonIndex);
                     int polygonSize = mesh->GetPolygonSize(polygonIndex);
                     for (int i = 0; i < polygonSize; i++)
                     {
@@ -202,10 +204,9 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
                         if (normalElement->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
                             normalIndex = normalElement->GetIndexArray().GetAt(indexByPolygonVertex);
 
-                        FbxVector4 normal = normalElement->GetDirectArray().GetAt(normalIndex);
-                        LOG("  Vertex ", mesh->GetPolygonVertex(polygonIndex, i), " - Normal (", normal[0], ", ", normal[1], ", ", normal[2], ")");
-                        //add your custom code here, to output normals or get them into a list, such as KArrayTemplate<FbxVector4>
-                        //. . .
+                        normal = normalElement->GetDirectArray().GetAt(normalIndex);
+                        //LOG("  Vertex ", mesh->GetPolygonVertex(polygonIndex, i), " - Normal (", normal[0], ", ", normal[1], ", ", normal[2], ")");
+
                         vertices[mesh->GetPolygonVertex(polygonIndex, i) + shift].Normal.x = static_cast<float>(normal[0]);
                         vertices[mesh->GetPolygonVertex(polygonIndex, i) + shift].Normal.y = static_cast<float>(normal[1]);
                         vertices[mesh->GetPolygonVertex(polygonIndex, i) + shift].Normal.z = static_cast<float>(normal[2]);
@@ -217,7 +218,263 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
             }
         }
 
+        //////////////////////////////////////////////////////////////////
+
+        for (int i = 0; i < mesh->GetElementUVCount(); ++i)
+        {
+            FbxGeometryElementUV* elementUV = mesh->GetElementUV(i);
+            FbxVector2 uv;
+
+            if (elementUV->GetMappingMode() == FbxGeometryElement::eByControlPoint)
+            {
+                ASSERT(false, "Not implemented");
+                for (int vertexIndex = 0; vertexIndex < mesh->GetControlPointsCount(); vertexIndex++)
+                {
+                    if (elementUV->GetReferenceMode() == FbxGeometryElement::eDirect)
+                    {
+                        uv = elementUV->GetDirectArray().GetAt(vertexIndex);
+                    }
+                    else if (elementUV->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+                    {
+                        int id = elementUV->GetIndexArray().GetAt(vertexIndex);
+                        uv = elementUV->GetDirectArray().GetAt(id);
+                    }
+                }
+            }
+            else if (elementUV->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+            {
+                for (int polygonIndex = 0; polygonIndex < mesh->GetPolygonCount(); polygonIndex++)
+                {
+                    LOG(" Polygon ", polygonIndex);
+                    int polygonSize = mesh->GetPolygonSize(polygonIndex);
+                    for (int i = 0; i < polygonSize; i++)
+                    {
+                        int textureUVIndex = mesh->GetTextureUVIndex(polygonIndex, i);
+                        if (elementUV->GetReferenceMode() == FbxGeometryElement::eDirect ||
+                            elementUV->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+                        {
+                            uv = elementUV->GetDirectArray().GetAt(textureUVIndex);
+                        }
+
+                        int id = mesh->GetPolygonVertex(polygonIndex, i) + shift;
+                        LOG("  Vertex ",id , " - Pos (", vertices[id].Pos.x, ", ", vertices[id].Pos.y, ", ", vertices[id].Pos.z,
+                            ") - UV (", uv[0], ", ", uv[1], ")");
+                        vertices[mesh->GetPolygonVertex(polygonIndex, i) + shift].Tex.x = static_cast<float>(uv[0]);
+                        vertices[mesh->GetPolygonVertex(polygonIndex, i) + shift].Tex.y = static_cast<float>(uv[1]);
+                    }
+                }
+            }
+        }
+
         ////////////////////////////////////////////////////////////////////////////////////
+    }
+
+    LOG("vertices size = ", vertices.size());
+    for (int i =0 ; i < vertices.size(); i++)
+    {
+        LOG(" Vertex ", i, ": Pos(", vertices[i].Pos.x, ", ", vertices[i].Pos.y, ", ", vertices[i].Pos.z,
+            ") Tex(", vertices[i].Tex.x, ", ", vertices[i].Tex.y, ")");
+    }
+
+    int i, count = pNode->GetChildCount();
+    for (i = 0; i < count; i++)
+    {
+        GetMeshDataOld(pNode->GetChild(i), vertices.size(), vertices, indices);
+    }
+}
+
+template<class T>
+int GetIndexByReferenceMode(const FbxLayerElementTemplate<T>* element, int vertexIndex)
+{
+    //reference mode is direct, the normal index is same as vertex index.
+    if (element->GetReferenceMode() == FbxGeometryElement::eDirect)
+    {
+        return vertexIndex;
+    }
+    //reference mode is index-to-direct, get normals by the index-to-direct
+    else if (element->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+    {
+        return element->GetIndexArray().GetAt(vertexIndex);
+    }
+    else
+    {
+        ASSERT(false, "Unsupported reference mode");
+        return 0;
+    }
+}
+
+FbxVector4 GetNormal(FbxMesh* mesh, int controlPointId, int indexByPolygonVertex)
+{
+    FbxVector4 normal;
+    FbxGeometryElementNormal* normalElement = mesh->GetElementNormal();
+    if (normalElement)
+    {
+        //mapping mode is by control points. The mesh should be smooth and soft.
+        if (normalElement->GetMappingMode() == FbxGeometryElement::eByControlPoint)
+        {
+            ASSERT(false, "Not implemented");
+            int normalIndex = GetIndexByReferenceMode(normalElement, controlPointId);
+            normal = normalElement->GetDirectArray().GetAt(normalIndex);
+            //add your custom code here, to output normals or get them into a list, such as KArrayTemplate<FbxVector4>
+            //. . .
+        }
+        //mapping mode is by polygon-vertex.
+        else if (normalElement->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+        {
+            int normalIndex = GetIndexByReferenceMode(normalElement, indexByPolygonVertex);
+            normal = normalElement->GetDirectArray().GetAt(normalIndex);
+        }
+    }
+    return normal;
+}
+
+FbxVector2 GetUV(FbxMesh* mesh, int polygonIndex, int positionInPolygon, int controlPointId)
+{
+    FbxVector2 uv;
+    FbxGeometryElementUV* elementUV = mesh->GetElementUV();
+    if (elementUV)
+    {
+        if (elementUV->GetMappingMode() == FbxGeometryElement::eByControlPoint)
+        {
+            ASSERT(false, "Not implemented");
+            int uvIndex = GetIndexByReferenceMode(elementUV, controlPointId);
+            uv = elementUV->GetDirectArray().GetAt(uvIndex);
+        }
+        else if (elementUV->GetMappingMode() == FbxGeometryElement::eByPolygonVertex)
+        {
+            int textureUVIndex = mesh->GetTextureUVIndex(polygonIndex, positionInPolygon);
+            if (elementUV->GetReferenceMode() == FbxGeometryElement::eDirect ||
+                elementUV->GetReferenceMode() == FbxGeometryElement::eIndexToDirect)
+            {
+                uv = elementUV->GetDirectArray().GetAt(textureUVIndex);
+            }
+
+            
+        }
+    }
+    return uv;
+}
+
+void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<VertexTextured>& vertices, std::vector<UINT>& indices)
+{
+    if (!pNode)
+        return;
+
+    static int meshNum = 0;
+
+    //std::random_device dev;
+    //std::mt19937 rng(dev());
+    //std::uniform_int_distribution<std::mt19937::result_type> dist6(0, 7); // distribution in range [0, 7]
+
+    FbxMesh* mesh = pNode->GetMesh();
+    if (mesh)
+    {
+        LOG("Mesh ", meshNum++);
+
+        // Extract vertex positions (control points)
+        int numControlPoints = mesh->GetControlPointsCount();
+        FbxVector4* controlPoints = mesh->GetControlPoints();
+
+        // Each element keeps indices to the vertices array where this control point is used
+        std::vector< std::vector<int> > controlPointsCopies(numControlPoints);
+        for (auto& vec : controlPointsCopies)
+        {
+            vec.reserve(10);
+        }
+
+        std::vector<int> tempIndices;
+        tempIndices.reserve(8);
+        int indexByPolygonVertex = 0;
+        int numPolygons = mesh->GetPolygonCount();
+
+        for (int polygonIndex = 0; polygonIndex < numPolygons; polygonIndex++)
+        {
+            //LOG(" Polygon ", polygonIndex);
+            tempIndices.clear(); // Indices for this polygon
+            int polygonSize = mesh->GetPolygonSize(polygonIndex);
+
+            for (int i = 0; i < polygonSize; i++)
+            {
+                VertexTextured vertex;
+                int controlPointId = mesh->GetPolygonVertex(polygonIndex, i);
+
+                vertex.Pos.x = controlPoints[controlPointId][0];
+                vertex.Pos.y = controlPoints[controlPointId][1];
+                vertex.Pos.z = controlPoints[controlPointId][2];
+                
+                const FbxVector4& normal = GetNormal(mesh, controlPointId, indexByPolygonVertex);
+                //LOG("  Vertex ", controlPointId, " - Normal (", normal[0], ", ", normal[1], ", ", normal[2], ")");
+                vertex.Normal.x = static_cast<float>(normal[0]);
+                vertex.Normal.y = static_cast<float>(normal[1]);
+                vertex.Normal.z = static_cast<float>(normal[2]);
+
+                const FbxVector2& uv = GetUV(mesh, polygonIndex, i, controlPointId);
+                //LOG("  Vertex ", controlPointId + shift,
+                // " - Pos (", vertices[controlPointId + shift].Pos.x, ", ", vertices[controlPointId + shift].Pos.y, ", ", vertices[controlPointId + shift].Pos.z,
+                // ") - UV (", uv[0], ", ", uv[1], ")");
+                vertex.Tex.x = static_cast<float>(uv[0]);
+                vertex.Tex.y = static_cast<float>(uv[1]);
+
+                indexByPolygonVertex++;
+
+                // Check if this control point was already used for this combination of attributes
+                bool found = false;
+                const auto& pointCopies = controlPointsCopies[controlPointId];
+                if (!pointCopies.empty())
+                {
+                    for (int j = 0; j < pointCopies.size(); j++)
+                    {
+                        const VertexTextured& usedVertex = vertices[pointCopies[j]];
+                        if (usedVertex.Normal.x == vertex.Normal.x &&
+                            usedVertex.Normal.y == vertex.Normal.y &&
+                            usedVertex.Normal.z == vertex.Normal.z &&
+                            usedVertex.Tex.x == vertex.Tex.x &&
+                            usedVertex.Tex.y == vertex.Tex.y)
+                        {
+                            // Reuse existing vertex
+                            tempIndices.push_back(static_cast<UINT>(pointCopies[j]));
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!found)
+                {
+                    // Create a new vertex
+                    vertices.push_back(vertex);
+                    UINT newIndex = static_cast<UINT>(vertices.size() - 1);
+                    tempIndices.push_back(newIndex);
+                    controlPointsCopies[controlPointId].push_back(newIndex + shift);
+                }
+
+
+            }
+
+            if (tempIndices.size() == 3)
+            {
+                indices.push_back(static_cast<UINT>(tempIndices[0] + shift));
+                indices.push_back(static_cast<UINT>(tempIndices[1] + shift));
+                indices.push_back(static_cast<UINT>(tempIndices[2] + shift));
+            }
+            else
+            {
+                // Split into triangles
+                for (int i = 2; i < tempIndices.size(); ++i)
+                {
+                    indices.push_back(static_cast<UINT>(tempIndices[0] + shift));
+                    indices.push_back(static_cast<UINT>(tempIndices[i - 1] + shift));
+                    indices.push_back(static_cast<UINT>(tempIndices[i] + shift));
+                }
+            }
+        }
+    }
+
+    LOG("vertices size = ", vertices.size());
+    for (int i =0 ; i < vertices.size(); i++)
+    {
+        LOG(" Vertex ", i, ": Pos(", vertices[i].Pos.x, ", ", vertices[i].Pos.y, ", ", vertices[i].Pos.z,
+            ") Tex(", vertices[i].Tex.x, ", ", vertices[i].Tex.y, ")");
     }
 
     int i, count = pNode->GetChildCount();
@@ -227,7 +484,7 @@ void FBXReader::GetMeshData(FbxNode* pNode, UINT shift, std::vector<Vertex>& ver
     }
 }
 
-void FBXReader::GetVertices(std::vector<Vertex>& vertices, std::vector<UINT>& indices)
+void FBXReader::GetVertices(std::vector<VertexTextured>& vertices, std::vector<UINT>& indices)
 {
     GetMeshData(mpRootNode, 0, vertices, indices);
 }

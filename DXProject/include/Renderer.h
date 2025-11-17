@@ -3,9 +3,9 @@
 #include <d3d11.h>
 #include <string>
 #include <RenderDefs.h>
-
-#include "Utils.h"
-#include "GameTimer.h"
+#include <Material.h>
+#include <Utils.h>
+#include <GameTimer.h>
 
 using namespace DirectX;
 
@@ -32,6 +32,7 @@ private:
     void CreateMesh();
     void CreateCubeMesh();
     void CreateConstantBuffers();
+    void CreateMaterial();
     void SetupLights();
 
     float AspectRatio() const;
@@ -39,21 +40,23 @@ private:
     bool mbInitialized;
 
     D3D_DRIVER_TYPE md3dDriverType;
-    ID3D11Device* md3dDevice;
-    ID3D11DeviceContext* md3dImmediateContext;
-    IDXGISwapChain* mSwapChain;
-    ID3D11Texture2D* mDepthStencilBuffer;
+    ComPtr<ID3D11Device> md3dDevice;
+    ComPtr<ID3D11DeviceContext> md3dImmediateContext;
+    ComPtr<IDXGISwapChain> mSwapChain;
+    ComPtr<ID3D11Texture2D> mDepthStencilBuffer;
 
-    ID3D11RenderTargetView* mRenderTargetView;
-    ID3D11DepthStencilView* mDepthStencilView;
+    ComPtr<ID3D11RenderTargetView> mRenderTargetView;
+    ComPtr<ID3D11DepthStencilView> mDepthStencilView;
     D3D11_VIEWPORT mScreenViewport;
 
-    ID3D11VertexShader* mVertexShader;
-    ID3D11PixelShader* mPixelShader;
+    ComPtr<ID3D11VertexShader> mVertexShader;
+    ComPtr<ID3D11PixelShader> mPixelShader;
 
-    ID3D11InputLayout* mInputLayout;
-    ID3D11Buffer* mPerFrameCbuffer;
-    ID3D11Buffer* mDirectionalLightBuffer;
+    Material mMaterial;
+
+    ComPtr<ID3D11InputLayout> mInputLayout;
+    ComPtr<ID3D11Buffer> mPerFrameCbuffer;
+    ComPtr<ID3D11Buffer> mDirectionalLightBuffer;
 
     UINT m4xMsaaQuality;
     bool mEnable4xMsaa;
